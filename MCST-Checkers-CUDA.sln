@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34330.188
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MCST-Checkers-CUDA", "MCST-Checkers-CUDA\MCST-Checkers-CUDA.vcxproj", "{A203F67A-C39A-4035-AD24-0871D3B4D713}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A203F67A-C39A-4035-AD24-0871D3B4D713}.Debug|x64.ActiveCfg = Debug|x64
+		{A203F67A-C39A-4035-AD24-0871D3B4D713}.Debug|x64.Build.0 = Debug|x64
+		{A203F67A-C39A-4035-AD24-0871D3B4D713}.Release|x64.ActiveCfg = Release|x64
+		{A203F67A-C39A-4035-AD24-0871D3B4D713}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {EB5E35DB-D172-413E-AC80-4550184345D9}
+	EndGlobalSection
+EndGlobal
