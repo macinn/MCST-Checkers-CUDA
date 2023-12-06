@@ -18,7 +18,6 @@ class Player
 {
 public:
     const uint32_t numberSimulations = DEFAULT_NUM_SIMULATIONS;
-    const uint32_t numberExplorations = 16;
     uint32_t timeLimit = DEFAULT_TIME_LIMIT;
     const bool isWhite;
     struct node* root;
@@ -37,19 +36,19 @@ public:
         root->promotedPieces = promoted;
         root->whiteToPlay = whiteToPlay;
     }
+    // find next move using MCTS and make it
     node* FindNextMove()
     {
 #ifdef DEBUG
         std::cout << "Debug: " << root->whitePieces << " " << root->blackPieces << " " << root->promotedPieces << std::endl;
 #endif // DEBUG
 
-        if (!(root->whitePieces > 0 && root->blackPieces > 0))
+        if (!(root->whitePieces > 0 && root->blackPieces > 0 && root->movesWithoutTake <= 40))
             return NULL;
 
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         node* nextBest = root;
         while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - begin).count() < timeLimit)
-        for (int i = 0; i < numberExplorations; i++)
         {
             // Selection
             nextBest = Selection();
@@ -92,6 +91,8 @@ public:
 
         return root;
     }
+
+    // print current board
     void Print()
     {
 #ifdef DEBUG
@@ -109,6 +110,8 @@ public:
         }
 #endif // DEBUG
     }
+
+    // move root to a node that mathes given
     bool MakeMove(node* newNode)
     {
         node* newRoot = nullptr;
@@ -136,18 +139,23 @@ public:
             return true;
         }
     }
+
+    // move root to a node that can be achived by moving piece from to a given idx
     bool InputMove(uint8_t moveFrom, uint8_t moveTo)
     {
+        const std::string badRequestInfo = "Illegal move!";
         uint32_t newWhite = root->whitePieces;
         uint32_t newBlack = root->blackPieces;
+        // generate all postion reachable from current, in case root has not expanded 
         node fakeRoot = *root;
         fakeRoot.children.clear();
         generateChildren(&fakeRoot);
+        // if move is legal make it, if its not possible display message return false
         if (!isWhite)
         {
             if ((!BIT(newWhite, moveFrom)) || (BIT((newWhite | newBlack), moveTo)))
             {
-                std::cerr << "Illegal move" << std::endl;
+                std::cerr << badRequestInfo << std::endl;
                 return false;
             }
             SET_BIT(newWhite, moveFrom, false);
@@ -159,7 +167,7 @@ public:
                     return MakeMove(child);
                 }
             }
-            std::cerr << "Illegal move" << std::endl;
+            std::cerr << badRequestInfo << std::endl;
             return false;
         }
         else
@@ -182,6 +190,8 @@ public:
             return false;
         }
     }
+
+    // backpropagation stage of MCTS
     void BackPropagate(node* child)
     {
         node* p = child->parentNode;
@@ -194,6 +204,8 @@ public:
             p = p->parentNode;
         }
     }
+
+    // selection stage of MCTS
     node* Selection()
     {
         node* p = root;
@@ -210,6 +222,7 @@ public:
                     break;
                 }
                 bool playerMove = child->whiteToPlay == root->whiteToPlay;
+                // if oponent on move, we need to count his win as loss
                 double score = playerMove * child->gamesWon + !playerMove * (child->gamesPlayed - child->gamesWon);
                 score /= child->gamesPlayed;
                 score += sqrt(EXPLORATION_CONST_SQARED * logN / child->gamesPlayed);
@@ -225,6 +238,8 @@ public:
         }
         return p;
     }
+
+    // select best move from children of root and make that move
     void MakeBestMove()
     {
         struct node* newRoot = nullptr;
@@ -250,6 +265,8 @@ public:
         delete root->parentNode;
         root->parentNode = nullptr;
     }
+
+    // method to implement simulations
     virtual void Simulate(node* node) = 0;
 };
 
@@ -260,11 +277,14 @@ public:
 
     void Simulate(node* node) override
     {
-        for (int j = 0; j < numberSimulations; j++)
+        uint32_t drawCount = 0;
+        for (uint32_t j = 0; j < numberSimulations; j++)
         {
             node->gamesWon += simulateTillEnd(node->whitePieces, node->blackPieces, node->promotedPieces,
-                node->movesWithoutTake, node->whiteToPlay);
+                node->movesWithoutTake, node->whiteToPlay, drawCount);
         }
+        // half point for a draw, possible loss of 0.5
+        node->gamesWon += drawCount / 2;
     }
 };
 

@@ -4,21 +4,26 @@
 
 #pragma once
 
+// fast bit reversal for 32bit long digit
 #define REVERSE32(b)    b = (b & 0xFFFF0000) >> 16 | (b & 0x0000FFFF) << 16; \
                         b = (b & 0xFF00FF00) >> 8 | (b & 0x00FF00FF) << 8; \
                         b = (b & 0xF0F0F0F0) >> 4 | (b & 0x0F0F0F0F) << 4; \
                         b = (b & 0xCCCCCCCC) >> 2 | (b & 0x33333333) << 2; \
                         b = (b & 0xAAAAAAAA) >> 1 | (b & 0x55555555) << 1;
 
+// get bit value at given postion
 #define BIT(a, b)   (bool)(((a) & (1 << (b))) >> (b))
 
+// set bit value at given postion
 #define SET_BIT(a, b, v)    a &= (~(1 << (b))); \
                             a |= ((v) << (b));
 
+// swap two values, without aditional memory
 #define SWAP(a, b)  a = a ^ b; \
                     b = a ^ b; \
                     a = a ^ b;
 
+// calculate position after capture, from given indexes on 32 bit board representation
 #define POSTION_AFTER_CAPTURE(positionBefore, positionOponent, postionAfter) \
     int8_t moveDiff = (positionOponent) - (positionBefore); \
     postionAfter = positionOponent \
@@ -39,7 +44,7 @@ constexpr uint8_t CAPTURES_Q_SIZE = 32;
 
 constexpr double EXPLORATION_CONST_SQARED = 2;
 
-// queue interface, if pop from empty queue result is unexpected
+// queue interface, read from empty queue and write over queue size is undefined
 template <class T>
 class Queue {
 public:
@@ -80,7 +85,7 @@ public:
     }
 };
 
-// leftmost bit of given number
+// least significant bit, that is set, of given number
 __host__ __device__ uint8_t firstBit(uint32_t x)
 {
     for (uint8_t i = 0; i < 32; i++)
@@ -89,7 +94,7 @@ __host__ __device__ uint8_t firstBit(uint32_t x)
     return 32;
 }
 
-// wypisz szachownicê na stdout
+// print board on stdout
 void printBoard(uint32_t whitePieces, uint32_t blackPieces, uint32_t promotedPieces)
 {
     std::string columns = " | A| B| C| D| E| F| G| H| ";
@@ -138,7 +143,7 @@ void printBoard(uint32_t whitePieces, uint32_t blackPieces, uint32_t promotedPie
     std::cout << '\t' << std::endl;
 }
 
-// wypisz szachownicê w formie binarnej na stdout
+// print board as binary on stdout
 void printBoardBinary(uint32_t pieces)
 {
     for (int i = 7; i >= 0; i--)

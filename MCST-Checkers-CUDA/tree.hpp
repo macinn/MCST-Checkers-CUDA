@@ -2,6 +2,7 @@
 #include "utils.hpp"
 #pragma once
 
+// add new child node to a parent
 #define APPEND_NEW_CHILD(parent, white, black, promoted, isCapture) \
         struct node* newChild = new struct node(); \
         newChild->whitePieces = white; \
@@ -12,9 +13,10 @@
         newChild->movesWithoutTake = !isCapture * (parent->movesWithoutTake + 1); \
         parent->children.push_back(newChild);
 
-#define MOVE(from, to, white, promoted)  \
-        SET_BIT(white, to, true);               \
-        SET_BIT(white, from, false); \
+// modify board as there was a move
+#define MOVE(from, to, playerPieces, promoted)  \
+        SET_BIT(playerPieces, to, true);               \
+        SET_BIT(playerPieces, from, false); \
         SET_BIT(promoted, to, BIT(promoted, from));     \
         SET_BIT(promoted, from, false);
 
@@ -72,7 +74,9 @@ __host__ __device__ void simulateOne(uint32_t player, uint32_t oponent, uint32_t
         | (playerDoublePawns & moveLeftDownAvailble) >> 5
         | (playerDoublePawns & moveRightDownAvailble) >> 3;
 
+    // pieces capturable while moving up
     uint32_t oponentPiecesCapturableUp = (freeTiles >> 4 | (freeTiles & moveLeftDownAvailble) >> 5 | (freeTiles & moveRightDownAvailble) >> 3) & newBlack & 0x0E7E'7E70;
+    // pieces capturable while moving down
     uint32_t oponentPiecesCapturableDown = (freeTiles << 4 & (freeTiles & moveRightUpAvailble) << 5 | (freeTiles & moveLeftUpAvailble) << 3) & newBlack & 0x0E7E'7E70;
 
     uint32_t availbleMovesNoCapWhite = (availbleMovesUp | availbleMovesDown) & freeTiles;
@@ -93,6 +97,8 @@ __host__ __device__ void simulateOne(uint32_t player, uint32_t oponent, uint32_t
             uint32_t boardAfterCap = 0;
             SET_BIT(boardAfterCap, i, true);
 
+            // doubled pawn moves
+            // if postion after capture is free and oponent is on rechable position, add it to capture queue to check if multicapture is possible
             {
                 if (BIT(playerDoublePawns, i + 4))
                 {
@@ -171,17 +177,19 @@ __host__ __device__ void simulateOne(uint32_t player, uint32_t oponent, uint32_t
             }
         }
 
+    // check capture queue for multicaptures
     while (!captureQ.empty())
     {
         uint32_t captureData = captureQ.front();
         captureQ.pop();
         uint32_t currentOponent = oponent & ~captureData;
         uint8_t currentPos = firstBit(captureData & freeTiles);
-        bool isQueen = BIT(promoted, currentPos);
+        bool isQueen = captureData & player & promoted;
         bool nextCapturePossible = false;
         int8_t positionAfter = 0;
         uint32_t boardAfterCap = 0;
 
+        // if another capture possible add to capture queue
         {
             if (isQueen)
             {
@@ -262,13 +270,14 @@ __host__ __device__ void simulateOne(uint32_t player, uint32_t oponent, uint32_t
             }
         }
 
+        // if no more capture possible add position after capture to availble moves queue
         if (!nextCapturePossible)
         {
             uint32_t currentPlayer = player;
             uint32_t currentPromoted = promoted;
             uint8_t startingPos = firstBit(player & captureData);
             SET_BIT(currentPlayer, currentPos, true);
-            SET_BIT(currentPromoted, currentPos, BIT(promoted, startingPos) || currentPos > 27);
+            SET_BIT(currentPromoted, currentPos, isQueen || currentPos > 27);
 
             SET_BIT(currentPlayer, startingPos, false);
             SET_BIT(currentPromoted, startingPos, false);
@@ -283,9 +292,11 @@ __host__ __device__ void simulateOne(uint32_t player, uint32_t oponent, uint32_t
 
     anyTakeAvailble = !availbleMovesQ->empty();
 
+    // if no take is possible check for no capture moves
     if (!anyTakeAvailble && availbleMovesNoCapWhite > 0)
         for (uint8_t i = 0; i < 32; i++)
         {
+            // for every field that is rechable, check how you can reach it and for every possible move add obtained position to availbleMovesQ
             if (!BIT(availbleMovesNoCapWhite, i)) continue;
 
             SET_BIT(newWhite, i, true);
@@ -374,13 +385,14 @@ __host__ __device__ void simulateOne(uint32_t player, uint32_t oponent, uint32_t
 }
 
 // simulare whole game, return true if player won
-bool simulateTillEnd(uint32_t white, uint32_t black, uint32_t promoted, uint8_t movesWithoutTake, bool whiteOnMove)
+bool simulateTillEnd(uint32_t white, uint32_t black, uint32_t promoted, uint8_t movesWithoutTake, bool whiteOnMove, uint32_t& drawCount)
 {
     uint32_t movesArray[MOVES_Q_SIZE];
     Queue<uint32_t> availbleMovesQ = Queue<uint32_t>(movesArray, MOVES_Q_SIZE);
-    bool playerOnMove = true;
+    bool playerOnMove = true;   // if person calling the function is making decision
     if (!whiteOnMove)
     {
+        // flip board, so player on move is always in white position
         SWAP(white, black);
         REVERSE32(white);
         REVERSE32(black);
@@ -388,8 +400,10 @@ bool simulateTillEnd(uint32_t white, uint32_t black, uint32_t promoted, uint8_t 
     }
     while (true)
     {
+        // draw condition
         if (movesWithoutTake > 40)
         {
+            drawCount++;
             return false;
         }
         simulateOne(white, black, promoted, movesWithoutTake, &availbleMovesQ);
@@ -398,18 +412,17 @@ bool simulateTillEnd(uint32_t white, uint32_t black, uint32_t promoted, uint8_t 
         if (length == 0)
         {
             if (black == 0)
-                return playerOnMove;
+                return playerOnMove;    // if player is to play, he is white
             if (white == 0)
                 return !playerOnMove;
-            return !playerOnMove;
+            return !playerOnMove;       // stalemate condition
         }
         length = rand() % length;
 
-        bool isCapture = movesArray[length * 3 + 1] != black;
+        bool isCapture = movesArray[length * 3 + 1] != black; // if oponent's pieces moves there was a capture
         white = movesArray[length * 3];
         black = movesArray[length * 3 + 1];
         promoted = movesArray[length * 3 + 2];
-        // printBoard(white, black, promoted, whiteOnMove);
 
         SWAP(white, black);
         REVERSE32(white);
@@ -418,11 +431,11 @@ bool simulateTillEnd(uint32_t white, uint32_t black, uint32_t promoted, uint8_t 
         availbleMovesQ.clear();
         whiteOnMove = !whiteOnMove;
         playerOnMove = !playerOnMove;
-        movesWithoutTake = !isCapture * (movesWithoutTake + 1);
+        movesWithoutTake = !isCapture * (movesWithoutTake + 1); 
     }
 }
 
-// popluates node->children 
+// popluates node->children, same logic as simulateTillEnd
 void generateChildren(node* node)
 {
     uint32_t movesArray[MOVES_Q_SIZE];
@@ -441,7 +454,7 @@ void generateChildren(node* node)
 
     for (uint8_t i = 0; i < availbleMovesQ.length() / 3; i++)
     {
-        bool isCapture = (movesArray[i * 3 + 1] ^ node->blackPieces) != 0;
+        bool isCapture = movesArray[i * 3 + 1] != black;
 
         white = movesArray[i * 3];
         black = movesArray[i * 3 + 1];

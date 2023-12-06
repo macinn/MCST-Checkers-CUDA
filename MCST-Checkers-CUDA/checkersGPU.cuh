@@ -23,11 +23,12 @@
     goto Error;}} while(0)
 
 #define BLOCKSIZE 512
-#define MAX_BLOCK_NUMBER 32
+#define MAX_BLOCK_NUMBER 64 
 
-// #define DEBUG // uncomment to see time needed for cudamalloc, curand, thrust::reduce
+//#define DEBUG // uncomment to see time needed for cudamalloc, curand, thrust::reduce
 
-__global__ void simulateGameKernel(uint32_t white, uint32_t black, uint32_t promoted, uint8_t movesWithoutTake, bool whiteToPlay, bool* result, uint8_t * random, uint32_t numberSimulations)
+// same logic as simulateTillEnd
+__global__ void simulateGameKernel(uint32_t white, uint32_t black, uint32_t promoted, uint8_t movesWithoutTake, bool whiteToPlay, bool* result, bool* draws, uint32_t * random, uint32_t numberSimulations)
 {
     const uint32_t idx = blockDim.x * blockIdx.x + threadIdx.x;
     if (idx >= numberSimulations)
@@ -52,9 +53,11 @@ __global__ void simulateGameKernel(uint32_t white, uint32_t black, uint32_t prom
     {
         if (movesWithoutTake > 40)
         {
+            draws[idx] = true;
             result[idx] = false;
             return;
         }
+
         simulateOne(white, black, promoted, movesWithoutTake, &availbleMovesQ);
 
         uint8_t length = availbleMovesQ.length() / 3;
@@ -96,7 +99,8 @@ __global__ void simulateGameKernel(uint32_t white, uint32_t black, uint32_t prom
 class PlayerGPU : public Player
 {
 private:
-    static const uint32_t maxSimulations = BLOCKSIZE * MAX_BLOCK_NUMBER;
+    // maximum number of threads running
+    const uint32_t maxSimulations = BLOCKSIZE * MAX_BLOCK_NUMBER;
     cudaError_t SimlateCUDA(node* node)
     {
 #ifdef DEBUG
@@ -109,11 +113,16 @@ private:
         bool afterFirstLoop = false; // check functions in loop once
 #endif // DEBUG
 
+        // determine if we can run all simulations at one
         const uint32_t simulationsPerCycle = std::min(maxSimulations, numberSimulations);
         const uint32_t requiredCycles = (numberSimulations - 1) / simulationsPerCycle + 1;
+
         const uint8_t numberBlocks = (simulationsPerCycle - 1) / BLOCKSIZE + 1;
-        uint8_t* dev_random = 0;
+
+        uint32_t* dev_random = 0;
         bool* dev_results = 0;
+        bool* dev_draws = 0;
+
         curandGenerator_t gen;
         cudaError_t cudaStatus;
         
@@ -121,13 +130,19 @@ private:
         if (cudaStatus != cudaSuccess) {
             fprintf(stderr, "cudaSetDevice failed!  Do you have a CUDA-capable GPU installed?");
             goto Error;
-        }
+        } 
 
 #ifdef DEBUG
         cudaEventRecord(start);
 #endif // DEBUG
 
-        cudaStatus = cudaMalloc((void**)&dev_random, simulationsPerCycle * RANDOMS_PER_THREAD * sizeof(uint8_t));
+        cudaStatus = cudaMalloc((void**)&dev_random, simulationsPerCycle * RANDOMS_PER_THREAD * sizeof(uint32_t));
+        if (cudaStatus != cudaSuccess) {
+            fprintf(stderr, "cudaMalloc failed!");
+            goto Error;
+        }
+
+        cudaStatus = cudaMalloc((void**)&dev_draws, simulationsPerCycle * sizeof(bool));
         if (cudaStatus != cudaSuccess) {
             fprintf(stderr, "cudaMalloc failed!");
             goto Error;
@@ -138,6 +153,7 @@ private:
             fprintf(stderr, "cudaMalloc failed!");
             goto Error;
         }
+
 
 #ifdef DEBUG
         cudaEventRecord(malloc);
@@ -152,14 +168,22 @@ private:
 
         for (uint32_t k = 0; k < requiredCycles; k++)
         {
-            CURAND_CALL(curandGenerate(gen, (uint32_t*)dev_random, simulationsPerCycle * RANDOMS_PER_THREAD * sizeof(uint8_t) / sizeof(uint32_t)));
+            // generare new seed for every batch
+            CURAND_CALL(curandGenerate(gen, dev_random, simulationsPerCycle * RANDOMS_PER_THREAD));
+
+            cudaStatus = cudaMemset(dev_draws, 0, simulationsPerCycle * sizeof(bool));
+            if (cudaStatus != cudaSuccess) {
+                fprintf(stderr, "cudaMemset failed!");
+                goto Error;
+            }
 
 #ifdef DEBUG
             if(!afterFirstLoop)
-                cudaEventRecord(curand);           
+                cudaEventRecord(curand);                    
 #endif // DEBUG
 
             uint32_t simulationToRun;
+            // at last cycle don't run full capacity, that should be remove as it only lowers performance, but it is there to not giva advantage against CPU in tests! 
             if (k == requiredCycles - 1)
             {
                 simulationToRun = numberSimulations - maxSimulations * k;
@@ -168,8 +192,9 @@ private:
             {
                 simulationToRun = maxSimulations;               
             }
+
             simulateGameKernel << <numberBlocks, BLOCKSIZE >> > (node->whitePieces, node->blackPieces, node->promotedPieces,
-                node->movesWithoutTake, node->whiteToPlay, dev_results, dev_random, simulationToRun);
+                node->movesWithoutTake, node->whiteToPlay, dev_results, dev_draws, dev_random, simulationToRun);
 
             cudaStatus = cudaGetLastError();
             if (cudaStatus != cudaSuccess) {
@@ -185,20 +210,25 @@ private:
 
 #ifdef DEBUG
             cudaEventRecord(thrustStart);
+            std::cout << "Execute " << simulationToRun << " simulations" << std::endl;
 #endif // DEBUG
 
-            int result = thrust::reduce(thrust::device, dev_results, dev_results + numberSimulations, 0);
-
+            uint32_t result = thrust::reduce(thrust::device, dev_results, dev_results + numberSimulations, 0);
+            // half point for a draw, possible loss of 0.5
+            result += thrust::reduce(thrust::device, dev_draws, dev_draws + numberSimulations, 0) / 2;
 #ifdef DEBUG
             cudaEventRecord(thrustStop);
             afterFirstLoop = true;
 #endif // DEBUG
             node->gamesWon += result;
         }
+
     Error:
         cudaFree(dev_random);
         cudaFree(dev_results);
-        CURAND_CALL(curandDestroyGenerator(gen));
+        cudaFree(dev_draws);
+        curandDestroyGenerator(gen);
+        //CURAND_CALL(curandDestroyGenerator(gen));
 
 #ifdef DEBUG
         cudaEventSynchronize(thrustStop);
@@ -209,16 +239,25 @@ private:
         std::cout << "cuRand: " << milliseconds  << " ms" << std::endl;
         cudaEventElapsedTime(&milliseconds, thrustStart, thrustStop);
         std::cout << "Thrust reduce: " << milliseconds  << " ms" << std::endl;
-
+        cudaEventDestroy(start);
+        cudaEventDestroy(malloc);
+        cudaEventDestroy(curand);
+        cudaEventDestroy(thrustStart);
+        cudaEventDestroy(thrustStop);     
 #endif // DEBUG
 
         return cudaStatus;
     }
 public:
-    PlayerGPU(bool isWhite, uint32_t numberSimulations) : Player(isWhite, numberSimulations) {}
+    PlayerGPU(bool isWhite, uint32_t numberSimulations = BLOCKSIZE * MAX_BLOCK_NUMBER) : Player(isWhite, numberSimulations) {}
+
 	void Simulate(node* node) override
 	{
-        SimlateCUDA(node);
+        cudaError_t cudaStatus = SimlateCUDA(node);
+        if (cudaStatus != cudaSuccess) {
+            fprintf(stderr, "Simulation failed!");
+            return;
+        }
 	}
 
 };
