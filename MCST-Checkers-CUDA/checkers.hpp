@@ -1,7 +1,7 @@
 #include <chrono>
 #include <algorithm>
 
-#include "utils.hpp"
+#include "tree.hpp"
 #pragma once
 
 #define INIT_PIECES(whitePieces, blackPieces) \
@@ -11,16 +11,18 @@
 void printBoard(uint32_t whitePieces, uint32_t blackPieces, uint32_t promotedPieces);
 void printBoardBinary(uint32_t piecies);
 
-#define TIME_LIMIT 5000 // ms to calculate new move
+#define DEFAULT_TIME_LIMIT 5000         // ms to calculate new move
+#define DEFAULT_NUM_SIMULATIONS 4096    // number of simulations after each exploration stage
 
 class Player
 {
-private:
 public:
-    const uint32_t numberSimulations = 4096;
+    const uint32_t numberSimulations = DEFAULT_NUM_SIMULATIONS;
+    const uint32_t numberExplorations = 16;
+    uint32_t timeLimit = DEFAULT_TIME_LIMIT;
     const bool isWhite;
     struct node* root;
-    Player(bool isWhite) : isWhite(isWhite)
+    Player(bool isWhite, uint32_t numberSimulations = DEFAULT_NUM_SIMULATIONS) : isWhite(isWhite), numberSimulations(numberSimulations)
     {
         root = new node();
         root->whiteToPlay = true;
@@ -40,13 +42,14 @@ public:
 #ifdef DEBUG
         std::cout << "Debug: " << root->whitePieces << " " << root->blackPieces << " " << root->promotedPieces << std::endl;
 #endif // DEBUG
+
         if (!(root->whitePieces > 0 && root->blackPieces > 0))
             return NULL;
-        node* nextBest = root;
-        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
-        //while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - begin).count() < TIME_LIMIT)
-        for (int i = 0; i < 16; i++)
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+        node* nextBest = root;
+        while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - begin).count() < timeLimit)
+        for (int i = 0; i < numberExplorations; i++)
         {
             // Selection
             nextBest = Selection();
@@ -89,7 +92,6 @@ public:
 
         return root;
     }
-
     void Print()
     {
 #ifdef DEBUG
@@ -253,10 +255,8 @@ public:
 
 class PlayerCPU : public Player
 {
-private:
-    const uint32_t numberSimulations = 4096;
 public:
-    PlayerCPU(bool isWhite): Player(isWhite){}
+    PlayerCPU(bool isWhite, uint32_t numberSimulations): Player(isWhite, numberSimulations){}
 
     void Simulate(node* node) override
     {
