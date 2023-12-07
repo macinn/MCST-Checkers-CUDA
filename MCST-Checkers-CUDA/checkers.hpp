@@ -11,13 +11,13 @@
 void printBoard(uint32_t whitePieces, uint32_t blackPieces, uint32_t promotedPieces);
 void printBoardBinary(uint32_t piecies);
 
-#define DEFAULT_TIME_LIMIT 5000         // ms to calculate new move
+#define DEFAULT_TIME_LIMIT 1000         // ms to calculate new move
 #define DEFAULT_NUM_SIMULATIONS 4096    // number of simulations after each exploration stage
 
 class Player
 {
 public:
-    const uint32_t numberSimulations = DEFAULT_NUM_SIMULATIONS;
+    uint32_t numberSimulations = DEFAULT_NUM_SIMULATIONS;
     uint32_t timeLimit = DEFAULT_TIME_LIMIT;
     const bool isWhite;
     struct node* root;
@@ -151,7 +151,7 @@ public:
         fakeRoot.children.clear();
         generateChildren(&fakeRoot);
         // if move is legal make it, if its not possible display message return false
-        if (!isWhite)
+        if (root->whiteToPlay)
         {
             if ((!BIT(newWhite, moveFrom)) || (BIT((newWhite | newBlack), moveTo)))
             {
@@ -221,9 +221,8 @@ public:
                     best = child;
                     break;
                 }
-                bool playerMove = child->whiteToPlay == root->whiteToPlay;
-                // if oponent on move, we need to count his win as loss
-                double score = playerMove * child->gamesWon + !playerMove * (child->gamesPlayed - child->gamesWon);
+                // in node we store how many games are a win for player currently on move, so every time we choose node with least wins for oponent
+                double score = child->gamesPlayed - child->gamesWon;
                 score /= child->gamesPlayed;
                 score += sqrt(EXPLORATION_CONST_SQARED * logN / child->gamesPlayed);
                 if (score > bestScoree)
@@ -268,6 +267,11 @@ public:
 
     // method to implement simulations
     virtual void Simulate(node* node) = 0;
+
+    bool gameEnded()
+    {
+        return !(root->whitePieces > 0 && root->blackPieces > 0 && root->movesWithoutTake <= 40);
+    }
 };
 
 class PlayerCPU : public Player

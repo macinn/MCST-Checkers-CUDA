@@ -23,7 +23,7 @@
     goto Error;}} while(0)
 
 #define BLOCKSIZE 512
-#define MAX_BLOCK_NUMBER 64 
+#define MAX_BLOCK_NUMBER 16 // zmienione po testach do raportu
 
 //#define DEBUG // uncomment to see time needed for cudamalloc, curand, thrust::reduce
 
@@ -31,6 +31,7 @@
 __global__ void simulateGameKernel(uint32_t white, uint32_t black, uint32_t promoted, uint8_t movesWithoutTake, bool whiteToPlay, bool* result, bool* draws, uint32_t * random, uint32_t numberSimulations)
 {
     const uint32_t idx = blockDim.x * blockIdx.x + threadIdx.x;
+    result[idx] = false;
     if (idx >= numberSimulations)
         return;
 
@@ -213,9 +214,9 @@ private:
             std::cout << "Execute " << simulationToRun << " simulations" << std::endl;
 #endif // DEBUG
 
-            uint32_t result = thrust::reduce(thrust::device, dev_results, dev_results + numberSimulations, 0);
+            uint32_t result = thrust::reduce(thrust::device, dev_results, dev_results + simulationToRun, 0);
             // half point for a draw, possible loss of 0.5
-            result += thrust::reduce(thrust::device, dev_draws, dev_draws + numberSimulations, 0) / 2;
+            result += thrust::reduce(thrust::device, dev_draws, dev_draws + simulationToRun, 0) / 2;
 #ifdef DEBUG
             cudaEventRecord(thrustStop);
             afterFirstLoop = true;

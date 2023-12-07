@@ -2,17 +2,6 @@
 #include "utils.hpp"
 #pragma once
 
-// add new child node to a parent
-#define APPEND_NEW_CHILD(parent, white, black, promoted, isCapture) \
-        struct node* newChild = new struct node(); \
-        newChild->whitePieces = white; \
-        newChild->blackPieces = black; \
-        newChild->promotedPieces = promoted; \
-        newChild->parentNode = parent; \
-        newChild->whiteToPlay = !parent->whiteToPlay; \
-        newChild->movesWithoutTake = !isCapture * (parent->movesWithoutTake + 1); \
-        parent->children.push_back(newChild);
-
 // modify board as there was a move
 #define MOVE(from, to, playerPieces, promoted)  \
         SET_BIT(playerPieces, to, true);               \
@@ -113,7 +102,7 @@ __host__ __device__ void simulateOne(uint32_t player, uint32_t oponent, uint32_t
                         SET_BIT(boardAfterCap, i, true);
                     }
                 }
-                if (BIT(playerDoublePawns & moveLeftDownAvailble, i + 5))
+                if (i + 5 < 32 && BIT(playerDoublePawns & moveLeftDownAvailble, i + 5))
                 {
                     POSTION_AFTER_CAPTURE(i + 5, i, positionAfter);
 
@@ -162,7 +151,7 @@ __host__ __device__ void simulateOne(uint32_t player, uint32_t oponent, uint32_t
                         SET_BIT(boardAfterCap, i, true);
                     }
                 }
-                if (BIT(moveLeftDownAvailble, i) && BIT(newWhite, i - 5))
+                if (i - 5 >= 0 && BIT(moveLeftDownAvailble, i) && BIT(newWhite, i - 5))
                 {
                     POSTION_AFTER_CAPTURE(i - 5, i, positionAfter);
                     if (BIT(freeTiles, positionAfter))
@@ -294,14 +283,14 @@ __host__ __device__ void simulateOne(uint32_t player, uint32_t oponent, uint32_t
 
     // if no take is possible check for no capture moves
     if (!anyTakeAvailble && availbleMovesNoCapWhite > 0)
-        for (uint8_t i = 0; i < 32; i++)
+        for (int8_t i = 0; i < 32; i++)
         {
             // for every field that is rechable, check how you can reach it and for every possible move add obtained position to availbleMovesQ
             if (!BIT(availbleMovesNoCapWhite, i)) continue;
 
             SET_BIT(newWhite, i, true);
 
-            if (BIT(newWhite, i - 4))
+            if (i - 4 >= 0 && BIT(newWhite, i - 4))
             {
                 bool isPromoted = BIT(newPromoted, i - 4);
                 SET_BIT(newWhite, i - 4, false);
@@ -316,7 +305,7 @@ __host__ __device__ void simulateOne(uint32_t player, uint32_t oponent, uint32_t
                 SET_BIT(newPromoted, i - 4, isPromoted);
                 SET_BIT(newWhite, i - 4, true);
             }
-            if (BIT(newWhite & moveLeftUpAvailble, i - 3))
+            if (i - 3 >= 0 && BIT(newWhite & moveLeftUpAvailble, i - 3))
             {
                 bool isPromoted = BIT(newPromoted, i - 3);
                 SET_BIT(newWhite, i - 3, false);
@@ -329,7 +318,7 @@ __host__ __device__ void simulateOne(uint32_t player, uint32_t oponent, uint32_t
                 SET_BIT(newPromoted, i - 3, isPromoted);
                 SET_BIT(newWhite, i - 3, true);
             }
-            if (BIT(newWhite & moveRightUpAvailble, i - 5))
+            if (i - 5 >= 0 && BIT(newWhite & moveRightUpAvailble, i - 5))
             {
                 bool isPromoted = BIT(newPromoted, i - 5);
                 SET_BIT(newWhite, i - 5, false);
@@ -343,7 +332,7 @@ __host__ __device__ void simulateOne(uint32_t player, uint32_t oponent, uint32_t
                 SET_BIT(newWhite, i - 5, true);
             }
 
-            if (BIT(newWhite & newPromoted, i + 4))
+            if (i + 4 < 32 && BIT(newWhite & newPromoted, i + 4))
             {
                 SET_BIT(newWhite, i + 4, false);
                 SET_BIT(newPromoted, i + 4, false);
@@ -355,7 +344,7 @@ __host__ __device__ void simulateOne(uint32_t player, uint32_t oponent, uint32_t
                 SET_BIT(newWhite, i + 4, true);
                 SET_BIT(newPromoted, i + 4, true);
             }
-            if (BIT(newWhite & newPromoted & moveLeftDownAvailble, i + 5))
+            if (i + 5 < 32 && BIT(newWhite & newPromoted & moveLeftDownAvailble, i + 5))
             {
                 SET_BIT(newWhite, i + 5, false);
                 SET_BIT(newPromoted, i + 5, false);
@@ -367,7 +356,7 @@ __host__ __device__ void simulateOne(uint32_t player, uint32_t oponent, uint32_t
                 SET_BIT(newWhite, i + 5, true);
                 SET_BIT(newPromoted, i + 5, true);
             }
-            if (BIT(newWhite & newPromoted & moveRightDownAvailble, i + 3))
+            if (i + 3 < 32 && BIT(newWhite & newPromoted & moveRightDownAvailble, i + 3))
             {
                 SET_BIT(newWhite, i + 3, false);
                 SET_BIT(newPromoted, i + 3, false);
@@ -419,7 +408,8 @@ bool simulateTillEnd(uint32_t white, uint32_t black, uint32_t promoted, uint8_t 
         }
         length = rand() % length;
 
-        bool isCapture = movesArray[length * 3 + 1] != black; // if oponent's pieces moves there was a capture
+        //bool isCapture = movesArray[length * 3 + 1] != black; // if oponent's pieces moves there was a capture
+        bool isCapture = true;
         white = movesArray[length * 3];
         black = movesArray[length * 3 + 1];
         promoted = movesArray[length * 3 + 2];
@@ -442,6 +432,7 @@ void generateChildren(node* node)
     Queue<uint32_t> availbleMovesQ = Queue<uint32_t>(movesArray, MOVES_Q_SIZE);
     uint32_t white = node->whitePieces, black = node->blackPieces, promoted = node->promotedPieces;
     bool swap = !node->whiteToPlay;
+
     if (swap)
     {
         SWAP(white, black);
@@ -454,7 +445,6 @@ void generateChildren(node* node)
 
     for (uint8_t i = 0; i < availbleMovesQ.length() / 3; i++)
     {
-        bool isCapture = movesArray[i * 3 + 1] != black;
 
         white = movesArray[i * 3];
         black = movesArray[i * 3 + 1];
@@ -467,6 +457,14 @@ void generateChildren(node* node)
             REVERSE32(black);
             REVERSE32(promoted);
         }
-        APPEND_NEW_CHILD(node, white, black, promoted, isCapture);
+        bool isCapture = movesArray[i * 3 + 1] != black && movesArray[i * 3] != white;
+
+        struct node* newChild = new struct node();
+        newChild->whitePieces = white; 
+        newChild->blackPieces = black;
+        newChild->promotedPieces = promoted; newChild->parentNode = node; 
+        newChild->whiteToPlay = !node->whiteToPlay; 
+        newChild->movesWithoutTake = !isCapture * (node->movesWithoutTake + 1); 
+        node->children.push_back(newChild);
     }
 }
