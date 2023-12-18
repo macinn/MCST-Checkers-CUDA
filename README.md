@@ -1,8 +1,8 @@
 # Monte Carlo Tree Search Checkers
 
 ## Description
-Implementation of [american checkers](https://www.usacheckers.com/) AI using [MCST](https://en.wikipedia.org/wiki/Monte_Carlo_tree_search) using [CUDA 12.2](https://developer.nvidia.com/cuda-downloads) and C++. Aplication contations CPU single core and GPU implementation. The user can face off against one of the bots, or the bots can play against each other. 
-Simple command line interface is provided.
+Implementation of [american checkers](https://www.usacheckers.com/) AI using [MCST](https://en.wikipedia.org/wiki/Monte_Carlo_tree_search) using [CUDA 12.2](https://developer.nvidia.com/cuda-downloads) and C++. The application includes CPU single-core and GPU implementation. The user can face off against one of the bots, or the bots can play against each other. 
+A simple command line interface is provided. Using NVIDIA GTX 1060 performance of **over 3 million** game simulations per second was achived.
 
          | A| B| C| D| E| F| G| H|
         -+--+--+--+--+--+--+--+--+-
