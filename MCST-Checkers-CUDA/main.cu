@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <conio.h>
 #include <chrono>
 
 #include "checkersGPU.cuh"
@@ -13,14 +14,15 @@
 
 #define TIMELIMIT 100 // ms for simulation each move
 // #define WAIT_FOR_INPUT // if defined user needs to press eneter to see next move
-#define SIMULATIONS_GPU 1024 * 16 // only valid for DUEL and PLAY_AGAINST
-#define SIMULATIONS_CPU 1024 * 4 // only valid for DUEL and PLAY_AGAINST
+#define SIMULATIONS_GPU 512 * 8 // only valid for DUEL and PLAY_AGAINST
+#define SIMULATIONS_CPU 128 // only valid for DUEL and PLAY_AGAINST
 
 
 void LoadOption(std::string nazwaZmiennej, uint32_t* var);
 
 int main()
 {
+    system("cls");
     while(true)
     {
         std::cout << "MCST-Checkers-CUDA Skrzypczak Marcin" << std::endl;
@@ -138,8 +140,12 @@ int main()
                         gameEnded = true;
                         break;
                     }
-                    node* moveCopy = new node(*move);
-                    black->MakeMove(moveCopy);
+                    else
+                    {
+                        node* moveCopy = new node(*move);
+                        moveCopy->children.clear();
+                        black->MakeMove(moveCopy);
+                    }
                 }
             }
 
@@ -168,8 +174,12 @@ int main()
                     gameEnded = true;
                     break;
                 }
-                node* moveCopy = new node(*move);
-                white->MakeMove(moveCopy);
+                else
+                {
+                    node* moveCopy = new node(*move);
+                    moveCopy->children.clear();
+                    white->MakeMove(moveCopy);
+                }
             }
         }
 
@@ -192,9 +202,9 @@ int main()
         delete white;
         delete black;
         std::cout << std::endl;
-        std::cout << "Nacisnij ENTER aby zagrac ponownie!" << std::endl;
-        std::cin.get();
-        system("ctl");
+        std::cout << "Nacisnij ENTER aby zagrac ponownie!";
+        getch();
+        system("cls");
     }
 // INSTRUKCJE PREPOCESORA
 #ifdef BENCHMARK

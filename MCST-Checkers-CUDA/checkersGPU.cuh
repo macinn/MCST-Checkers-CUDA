@@ -23,7 +23,7 @@
     goto Error;}} while(0)
 
 #define BLOCKSIZE 512
-#define MAX_BLOCK_NUMBER 16 // zmienione po testach do raportu
+#define MAX_BLOCK_NUMBER 8 // zmienione po testach do raportu
 
 //#define DEBUG // uncomment to see time needed for cudamalloc, curand, thrust::reduce
 
@@ -52,14 +52,15 @@ __global__ void simulateGameKernel(uint32_t white, uint32_t black, uint32_t prom
     }
     while (true)
     {
-        if (movesWithoutTake > 40)
+        if (movesWithoutTake > 80)
         {
             draws[idx] = true;
             result[idx] = false;
             return;
         }
 
-        simulateOne(white, black, promoted, movesWithoutTake, &availbleMovesQ);
+        simulateOne(white, black, promoted, &availbleMovesQ);
+        bool isCapture = movesArray[1] != black;
 
         uint8_t length = availbleMovesQ.length() / 3;
         if (length == 0)
@@ -81,7 +82,7 @@ __global__ void simulateGameKernel(uint32_t white, uint32_t black, uint32_t prom
         // custom fast random number generator
         length = KISS % length; 
 
-        bool isCapture = movesArray[length * 3 + 1] != black;
+        
         white = movesArray[length * 3];
         black = movesArray[length * 3 + 1];
         promoted = movesArray[length * 3 + 2];
@@ -216,7 +217,7 @@ private:
 
             uint32_t result = thrust::reduce(thrust::device, dev_results, dev_results + simulationToRun, 0);
             // half point for a draw, possible loss of 0.5
-            result += thrust::reduce(thrust::device, dev_draws, dev_draws + simulationToRun, 0) / 2;
+            result += (thrust::reduce(thrust::device, dev_draws, dev_draws + simulationToRun, 0)-1) / 2 + 1;
 #ifdef DEBUG
             cudaEventRecord(thrustStop);
             afterFirstLoop = true;

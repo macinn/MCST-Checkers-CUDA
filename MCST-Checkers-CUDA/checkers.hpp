@@ -27,6 +27,12 @@ public:
         root->whiteToPlay = true;
         INIT_PIECES(root->whitePieces, root->blackPieces);
     }
+
+    ~Player()
+    {
+        deleteNode(root);
+    }
+
     void LoadPosition(uint32_t white, uint32_t black, uint32_t promoted, bool whiteToPlay)
     {
         deleteNode(root);
@@ -43,7 +49,7 @@ public:
         std::cout << "Debug: " << root->whitePieces << " " << root->blackPieces << " " << root->promotedPieces << std::endl;
 #endif // DEBUG
 
-        if (!(root->whitePieces > 0 && root->blackPieces > 0 && root->movesWithoutTake <= 40))
+        if (!(root->whitePieces > 0 && root->blackPieces > 0 && root->movesWithoutTake <= 80))
             return NULL;
 
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
@@ -270,7 +276,7 @@ public:
 
     bool gameEnded()
     {
-        return !(root->whitePieces > 0 && root->blackPieces > 0 && root->movesWithoutTake <= 40);
+        return !(root->whitePieces > 0 && root->blackPieces > 0 && root->movesWithoutTake <= 80);
     }
 };
 
@@ -288,7 +294,7 @@ public:
                 node->movesWithoutTake, node->whiteToPlay, drawCount);
         }
         // half point for a draw, possible loss of 0.5
-        node->gamesWon += drawCount / 2;
+        node->gamesWon += (drawCount - 1) / 2 + 1;
     }
 };
 

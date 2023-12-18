@@ -39,7 +39,7 @@ void deleteNode(node* node)
 }
 
 // popluates given queue with possible moves
-__host__ __device__ void simulateOne(uint32_t player, uint32_t oponent, uint32_t promoted, uint8_t movesWithoutTake, Queue<uint32_t>* availbleMovesQ)
+__host__ __device__ void simulateOne(uint32_t player, uint32_t oponent, uint32_t promoted, Queue<uint32_t>* availbleMovesQ)
 {
     uint32_t newWhite = player;
     uint32_t newBlack = oponent;
@@ -390,12 +390,13 @@ bool simulateTillEnd(uint32_t white, uint32_t black, uint32_t promoted, uint8_t 
     while (true)
     {
         // draw condition
-        if (movesWithoutTake > 40)
+        if (movesWithoutTake > 80)
         {
             drawCount++;
             return false;
         }
-        simulateOne(white, black, promoted, movesWithoutTake, &availbleMovesQ);
+        simulateOne(white, black, promoted, &availbleMovesQ);
+        bool isCapture = movesArray[1] != black; // if oponent's pieces differ there was a capture
 
         uint8_t length = availbleMovesQ.length() / 3;
         if (length == 0)
@@ -408,8 +409,6 @@ bool simulateTillEnd(uint32_t white, uint32_t black, uint32_t promoted, uint8_t 
         }
         length = rand() % length;
 
-        //bool isCapture = movesArray[length * 3 + 1] != black; // if oponent's pieces moves there was a capture
-        bool isCapture = true;
         white = movesArray[length * 3];
         black = movesArray[length * 3 + 1];
         promoted = movesArray[length * 3 + 2];
@@ -441,11 +440,11 @@ void generateChildren(node* node)
         REVERSE32(promoted);
     }
 
-    simulateOne(white, black, promoted, node->movesWithoutTake, &availbleMovesQ);
+    simulateOne(white, black, promoted, &availbleMovesQ);
+    bool isCapture = movesArray[1] != black;
 
     for (uint8_t i = 0; i < availbleMovesQ.length() / 3; i++)
     {
-
         white = movesArray[i * 3];
         black = movesArray[i * 3 + 1];
         promoted = movesArray[i * 3 + 2];
@@ -457,7 +456,6 @@ void generateChildren(node* node)
             REVERSE32(black);
             REVERSE32(promoted);
         }
-        bool isCapture = movesArray[i * 3 + 1] != black && movesArray[i * 3] != white;
 
         struct node* newChild = new struct node();
         newChild->whitePieces = white; 
