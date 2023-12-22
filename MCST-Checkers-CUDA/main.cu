@@ -59,6 +59,7 @@ int main()
                 if (noCudaDevice)
                 {
                     askAgain = true;
+                    std::cout << "Invalid value!" << std::endl;
                     break;
                 }
                 white = new PlayerGPU(true, SIMULATIONS_GPU);
@@ -95,6 +96,7 @@ int main()
                 if (noCudaDevice)
                 {
                     askAgain = true;
+                    std::cout << "Invalid value!" << std::endl;
                     break;
                 }
                 black = new PlayerGPU(false, SIMULATIONS_GPU);
