@@ -4,7 +4,6 @@
 #include <sstream>
 #include <conio.h>
 #include <chrono>
-
 #include "checkersGPU.cuh"
 
 // Run modes
@@ -23,6 +22,12 @@ void LoadOption(std::string nazwaZmiennej, uint32_t* var);
 int main()
 {
     system("cls");
+
+
+    // Check if cuda capable
+    cudaError_t cudaStatus = cudaSetDevice(0);
+    const bool noCudaDevice = cudaStatus != cudaSuccess;
+
     while(true)
     {
         std::cout << "MCST-Checkers-CUDA Skrzypczak Marcin" << std::endl;
@@ -30,10 +35,13 @@ int main()
         bool askAgain;
         Player* white, * black;
         bool userWhite = false, userBlack = false;
-        std::cout << "Gracz bialy:" << std::endl;
-        std::cout << "1. Uzytkownik" << std::endl;
+        std::cout << "White:" << std::endl;
+        std::cout << "1. Player" << std::endl;
         std::cout << "2. CPU" << std::endl;
-        std::cout << "3. GPU" << std::endl;
+        if(noCudaDevice)
+            std::cout << "[No CUDA-capable GPU!] 3. GPU" << std::endl;
+        else
+            std::cout << "3. GPU" << std::endl;
         do
         {
             askAgain = false;
@@ -48,20 +56,28 @@ int main()
                 white = new PlayerCPU(true, SIMULATIONS_CPU);
                 break;
             case 3:
+                if (noCudaDevice)
+                {
+                    askAgain = true;
+                    break;
+                }
                 white = new PlayerGPU(true, SIMULATIONS_GPU);
                 break;
             default:
                 askAgain = true;
-                std::cout << "Nieprawidłowa wartość!" << std::endl;
+                std::cout << "Invalid value!" << std::endl;
                 break;
             }
         } while (askAgain);
         system("cls");
 
-        std::cout << "Gracz czarny:" << std::endl;
-        std::cout << "1. Uzytkownik" << std::endl;
+        std::cout << "Black:" << std::endl;
+        std::cout << "1. Player" << std::endl;
         std::cout << "2. CPU" << std::endl;
-        std::cout << "3. GPU" << std::endl;
+        if (noCudaDevice)
+            std::cout << "[No CUDA-capable GPU!] 3. GPU" << std::endl;
+        else
+            std::cout << "3. GPU" << std::endl;
         do
         {
             askAgain = false;
@@ -76,11 +92,16 @@ int main()
                 black = new PlayerCPU(false, SIMULATIONS_CPU);
                 break;
             case 3:
+                if (noCudaDevice)
+                {
+                    askAgain = true;
+                    break;
+                }
                 black = new PlayerGPU(false, SIMULATIONS_GPU);
                 break;
             default:
                 askAgain = true;
-                std::cout << "Nieprawidłowa wartość!" << std::endl;
+                std::cout << "Invalid value!" << std::endl;
                 break;
             }
         } while (askAgain);
@@ -90,21 +111,21 @@ int main()
 
         if (!userBlack || !userWhite)
         {
-            std::cout << "Czy chesz dostosowac ustawienia graczy? [Y/N]";
+            std::cout << "Do you want to set the bots' parameters? [Y/N]";
             std::cin >> input;
             if (input.compare("Y") == 0 || input.compare("y") == 0)
             {
                 if (!userWhite)
                 {
-                    std::cout << "Gracz bialy:" << std::endl;
-                    LoadOption("Limit czasu na ruch[ms]", &white->timeLimit);
-                    LoadOption("Ilosc symulacji z wybranego liscia:", &white->numberSimulations);
+                    std::cout << "White:" << std::endl;
+                    LoadOption("Time limit [ms]", &white->timeLimit);
+                    LoadOption("The number of simulations from the chosen leaf:", &white->numberSimulations);
                 }
                 if (!userBlack)
                 {
-                    std::cout << "Gracz czarny:" << std::endl;
-                    LoadOption("Limit czasu na ruch[ms]", &black->timeLimit);
-                    LoadOption("Ilosc symulacji z wybranego liscia:", &black->numberSimulations);
+                    std::cout << "Black:" << std::endl;
+                    LoadOption("Time limit [ms]", &black->timeLimit);
+                    LoadOption("The number of simulations from the chosen leaf::", &black->numberSimulations);
                 }
             }
         }
@@ -123,7 +144,7 @@ int main()
                     uint8_t moveFrom, moveTo;
                     std::string inputFrom, inputTo;
 
-                    std::cout << "Type you move as [from] [to] fx 'A4 B3'" << std::endl;
+                    std::cout << "Type your move as [from] [to] fx 'A4 B3'" << std::endl;
                     do
                     {
                         std::cin >> inputFrom >> inputTo;
@@ -157,7 +178,7 @@ int main()
                 uint8_t moveFrom, moveTo;
                 std::string inputFrom, inputTo;
 
-                std::cout << "Type you move as [from] [to] fx 'A4 B3'" << std::endl;
+                std::cout << "Type your move as [from] [to] fx 'A4 B3'" << std::endl;
                 do
                 {
                     std::cin >> inputFrom >> inputTo;
