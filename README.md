@@ -77,7 +77,3 @@ $ nvcc .\MCST-Checkers-CUDA\main.cu -lcurand -o MCST-Checkers
 # Run the app
 $ .\MCST-Checkers.exe
 ```
-
-## License
-MIT
-
